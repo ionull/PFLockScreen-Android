@@ -17,8 +17,11 @@
 package com.beautycoder.pflockscreen.fragments;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.os.Build;
 import android.os.Bundle;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.fragment.app.DialogFragment;
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
@@ -103,6 +106,12 @@ public class PFFingerprintAuthDialogFragment extends DialogFragment {
     @Override
     public void onPause() {
         super.onPause();
+        mFingerprintCallback.stopListening();
+    }
+
+    @Override
+    public void onDismiss(@NonNull DialogInterface dialog) {
+        super.onDismiss(dialog);
         mFingerprintCallback.stopListening();
     }
 
