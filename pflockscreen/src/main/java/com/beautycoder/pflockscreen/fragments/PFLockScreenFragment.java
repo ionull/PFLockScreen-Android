@@ -12,7 +12,6 @@ import android.os.Bundle;
 import android.os.Vibrator;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,6 +27,11 @@ import com.beautycoder.pflockscreen.R;
 import com.beautycoder.pflockscreen.security.PFResult;
 import com.beautycoder.pflockscreen.viewmodels.PFPinCodeViewModel;
 import com.beautycoder.pflockscreen.views.PFCodeView;
+import com.github.ajalt.reprint.core.AuthenticationFailureReason;
+import com.github.ajalt.reprint.core.AuthenticationListener;
+import com.github.ajalt.reprint.core.Reprint;
+
+import java.lang.ref.WeakReference;
 
 /**
  * Created by Aleksandr Nikiforov on 2018/02/07.
@@ -116,11 +120,17 @@ public class PFLockScreenFragment extends Fragment {
 
     @Override
     public void onStart() {
+        super.onStart();
         if (!mIsCreateMode && mUseFingerPrint && mConfiguration.isAutoShowFingerprint() &&
                 isFingerprintApiAvailable(getActivity()) && isFingerprintsExists(getActivity())) {
             mOnFingerprintClickListener.onClick(mFingerprintButton);
         }
-        super.onStart();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        mLoginListener = null;
     }
 
     public void setConfiguration(PFFLockScreenConfiguration configuration) {
@@ -226,27 +236,33 @@ public class PFLockScreenFragment extends Fragment {
                 return;
             }
 
-            final PFFingerprintAuthDialogFragment fragment
-                    = new PFFingerprintAuthDialogFragment();
-            fragment.show(getFragmentManager(), FINGERPRINT_DIALOG_FRAGMENT_TAG);
-            fragment.setAuthListener(new PFFingerprintAuthListener() {
-                @Override
-                public void onAuthenticated() {
-                    if (mLoginListener != null) {
-                        mLoginListener.onFingerprintSuccessful();
-                    }
-                    fragment.dismiss();
-                }
 
-                @Override
-                public void onError() {
-                    if (mLoginListener != null) {
-                        mLoginListener.onFingerprintLoginFailed();
-                    }
-                }
-            });
+            Reprint.authenticate(new ReprintListener(mLoginListener));
         }
     };
+
+    private static class ReprintListener implements AuthenticationListener {
+        private WeakReference<OnPFLockScreenLoginListener> ref;
+
+        ReprintListener(OnPFLockScreenLoginListener listener) {
+            ref = new WeakReference<>(listener);
+        }
+
+        public void onSuccess(int moduleTag) {
+            OnPFLockScreenLoginListener listener = ref.get();
+            if (listener != null) {
+                listener.onFingerprintSuccessful();
+            }
+        }
+
+        public void onFailure(AuthenticationFailureReason failureReason, boolean fatal,
+        CharSequence errorMessage, int moduleTag, int errorCode) {
+            OnPFLockScreenLoginListener listener = ref.get();
+            if (listener != null) {
+                listener.onFingerprintLoginFailed();
+            }
+        }
+    }
 
     private void configureRightButton(int codeLength) {
         if (mIsCreateMode) {
@@ -274,15 +290,16 @@ public class PFLockScreenFragment extends Fragment {
         }
 
         mDeleteButton.setEnabled(false);
-
     }
 
     private boolean isFingerprintApiAvailable(Context context) {
-        return FingerprintManagerCompat.from(context).isHardwareDetected();
+        return Reprint.isHardwarePresent();
+        //return FingerprintManagerCompat.from(context).isHardwareDetected();
     }
 
     private boolean isFingerprintsExists(Context context) {
-        return FingerprintManagerCompat.from(context).hasEnrolledFingerprints();
+        return Reprint.hasFingerprintRegistered();
+        //return FingerprintManagerCompat.from(context).hasEnrolledFingerprints();
     }
 
 
@@ -527,7 +544,6 @@ public class PFLockScreenFragment extends Fragment {
         void onFingerprintLoginFailed();
 
     }
-
 
 }
 
