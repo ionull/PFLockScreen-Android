@@ -7,11 +7,13 @@ group='com.github.thealeksandr'
 final def lifecycle_version = "2.0.0"
 
 android {
-    compileSdkVersion 28
+    namespace "com.beautycoder.pflockscreen"
+
+    compileSdkVersion 33
 
     defaultConfig {
         minSdkVersion 15
-        targetSdkVersion 28
+        targetSdkVersion 33
         versionCode 1
         versionName "1.0.0-beta6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
