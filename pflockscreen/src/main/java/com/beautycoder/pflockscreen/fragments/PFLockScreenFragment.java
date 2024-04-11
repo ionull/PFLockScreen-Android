@@ -1,11 +1,16 @@
 package com.beautycoder.pflockscreen.fragments;
 
+import static androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG;
+import static androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+
 import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.Observer;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -27,11 +32,8 @@ import com.beautycoder.pflockscreen.R;
 import com.beautycoder.pflockscreen.security.PFResult;
 import com.beautycoder.pflockscreen.viewmodels.PFPinCodeViewModel;
 import com.beautycoder.pflockscreen.views.PFCodeView;
-import com.github.ajalt.reprint.core.AuthenticationFailureReason;
-import com.github.ajalt.reprint.core.AuthenticationListener;
-import com.github.ajalt.reprint.core.Reprint;
 
-import java.lang.ref.WeakReference;
+import java.util.concurrent.Executor;
 
 /**
  * Created by Aleksandr Nikiforov on 2018/02/07.
@@ -40,6 +42,7 @@ import java.lang.ref.WeakReference;
  * fingerprint authorization for API 23 +.
  */
 public class PFLockScreenFragment extends Fragment {
+    private String biometricHint = " ";
 
     private static final String TAG = PFLockScreenFragment.class.getName();
 
@@ -131,6 +134,10 @@ public class PFLockScreenFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         mLoginListener = null;
+    }
+
+    public void setBiometricHint(String hint) {
+        this.biometricHint = hint;
     }
 
     public void setConfiguration(PFFLockScreenConfiguration configuration) {
@@ -236,33 +243,44 @@ public class PFLockScreenFragment extends Fragment {
                 return;
             }
 
+            Executor executor = ContextCompat.getMainExecutor(v.getContext());
+            BiometricPrompt biometricPrompt = new BiometricPrompt(PFLockScreenFragment.this,
+                    executor, new BiometricPrompt.AuthenticationCallback() {
+                @Override
+                public void onAuthenticationError(int errorCode,
+                                                  @NonNull CharSequence errString) {
+                    super.onAuthenticationError(errorCode, errString);
+                    if (mLoginListener != null) {
+                        mLoginListener.onFingerprintLoginFailed();
+                    }
+                }
 
-            Reprint.authenticate(new ReprintListener(mLoginListener));
+                @Override
+                public void onAuthenticationSucceeded(
+                        @NonNull BiometricPrompt.AuthenticationResult result) {
+                    super.onAuthenticationSucceeded(result);
+                    if (mLoginListener != null) {
+                        mLoginListener.onFingerprintSuccessful();
+                    }
+                }
+
+                @Override
+                public void onAuthenticationFailed() {
+                    super.onAuthenticationFailed();
+                    if (mLoginListener != null) {
+                        mLoginListener.onFingerprintLoginFailed();
+                    }
+                }
+            });
+
+            BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                    .setTitle(biometricHint)
+                    //.setSubtitle("")
+                    .setAllowedAuthenticators(BIOMETRIC_STRONG | DEVICE_CREDENTIAL)
+                    .build();
+            biometricPrompt.authenticate(promptInfo);
         }
     };
-
-    private static class ReprintListener implements AuthenticationListener {
-        private WeakReference<OnPFLockScreenLoginListener> ref;
-
-        ReprintListener(OnPFLockScreenLoginListener listener) {
-            ref = new WeakReference<>(listener);
-        }
-
-        public void onSuccess(int moduleTag) {
-            OnPFLockScreenLoginListener listener = ref.get();
-            if (listener != null) {
-                listener.onFingerprintSuccessful();
-            }
-        }
-
-        public void onFailure(AuthenticationFailureReason failureReason, boolean fatal,
-        CharSequence errorMessage, int moduleTag, int errorCode) {
-            OnPFLockScreenLoginListener listener = ref.get();
-            if (listener != null) {
-                listener.onFingerprintLoginFailed();
-            }
-        }
-    }
 
     private void configureRightButton(int codeLength) {
         if (mIsCreateMode) {
@@ -293,13 +311,16 @@ public class PFLockScreenFragment extends Fragment {
     }
 
     private boolean isFingerprintApiAvailable(Context context) {
-        return Reprint.isHardwarePresent();
         //return FingerprintManagerCompat.from(context).isHardwareDetected();
+        return BiometricManager.from(context)
+                .canAuthenticate(
+                        BIOMETRIC_STRONG | DEVICE_CREDENTIAL
+                ) == BiometricManager.BIOMETRIC_SUCCESS;
     }
 
     private boolean isFingerprintsExists(Context context) {
-        return Reprint.hasFingerprintRegistered();
         //return FingerprintManagerCompat.from(context).hasEnrolledFingerprints();
+        return true;
     }
 
 
@@ -309,14 +330,9 @@ public class PFLockScreenFragment extends Fragment {
                 .setMessage(R.string.no_fingerprints_message_pf)
                 .setCancelable(true)
                 .setNegativeButton(R.string.cancel_pf, null)
-                .setPositiveButton(R.string.settings_pf, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        startActivity(
-                                new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
-                        );
-                    }
-                }).create().show();
+                .setPositiveButton(R.string.settings_pf, (dialog, which) -> startActivity(
+                        new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)
+                )).create().show();
     }
 
 
@@ -331,27 +347,24 @@ public class PFLockScreenFragment extends Fragment {
             mCode = code;
             mPFPinCodeViewModel.checkPin(getContext(), mEncodedPinCode, mCode).observe(
                     PFLockScreenFragment.this,
-                    new Observer<PFResult<Boolean>>() {
-                        @Override
-                        public void onChanged(@Nullable PFResult<Boolean> result) {
-                            if (result == null) {
-                                return;
+                    result -> {
+                        if (result == null) {
+                            return;
+                        }
+                        if (result.getError() != null) {
+                            return;
+                        }
+                        final boolean isCorrect = result.getResult();
+                        if (mLoginListener != null) {
+                            if (isCorrect) {
+                                mLoginListener.onCodeInputSuccessful();
+                            } else {
+                                mLoginListener.onPinLoginFailed();
+                                errorAction();
                             }
-                            if (result.getError() != null) {
-                                return;
-                            }
-                            final boolean isCorrect = result.getResult();
-                            if (mLoginListener != null) {
-                                if (isCorrect) {
-                                    mLoginListener.onCodeInputSuccessful();
-                                } else {
-                                    mLoginListener.onPinLoginFailed();
-                                    errorAction();
-                                }
-                            }
-                            if (!isCorrect && mConfiguration.isClearCodeOnError()) {
-                                mCodeView.clearCode();
-                            }
+                        }
+                        if (!isCorrect && mConfiguration.isClearCodeOnError()) {
+                            mCodeView.clearCode();
                         }
                     });
 
