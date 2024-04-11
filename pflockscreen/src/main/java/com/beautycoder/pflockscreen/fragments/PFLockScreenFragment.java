@@ -43,7 +43,6 @@ import java.util.concurrent.Executor;
  * fingerprint authorization for API 23 +.
  */
 public class PFLockScreenFragment extends Fragment {
-    private String biometricHint = " ";
     public static int bioFlags = BIOMETRIC_WEAK | DEVICE_CREDENTIAL;
 
     private static final String TAG = PFLockScreenFragment.class.getName();
@@ -140,10 +139,6 @@ public class PFLockScreenFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         mLoginListener = null;
-    }
-
-    public void setBiometricHint(String hint) {
-        this.biometricHint = hint;
     }
 
     public void setConfiguration(PFFLockScreenConfiguration configuration) {
@@ -280,7 +275,7 @@ public class PFLockScreenFragment extends Fragment {
             });
 
             BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                    .setTitle(biometricHint)
+                    .setTitle(mConfiguration.getBiometricHint())
                     //.setSubtitle("")
                     .setAllowedAuthenticators(bioFlags)
                     .build();

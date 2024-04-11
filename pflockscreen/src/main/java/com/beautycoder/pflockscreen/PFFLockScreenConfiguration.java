@@ -25,6 +25,7 @@ public class PFFLockScreenConfiguration implements Serializable {
     private boolean mErrorAnimation = true;
     private boolean mNewCodeValidation = false;
     private String mNewCodeValidationTitle = "";
+    private String mBiometricHint = " ";
 
     private PFFLockScreenConfiguration(Builder builder) {
         mLeftButton = builder.mLeftButton;
@@ -39,6 +40,7 @@ public class PFFLockScreenConfiguration implements Serializable {
         mErrorAnimation = builder.mErrorAnimation;
         mNewCodeValidation = builder.mNewCodeValidation;
         mNewCodeValidationTitle = builder.mNewCodeValidationTitle;
+        mBiometricHint = builder.mBiometricHint;
     }
 
     public String getLeftButton() {
@@ -90,6 +92,10 @@ public class PFFLockScreenConfiguration implements Serializable {
         return this.mMode;
     }
 
+    public String getBiometricHint() {
+        return mBiometricHint;
+    }
+
     public static class Builder {
 
         private String mLeftButton = "";
@@ -104,6 +110,7 @@ public class PFFLockScreenConfiguration implements Serializable {
         private boolean mErrorAnimation = true;
         private boolean mNewCodeValidation = false;
         private String mNewCodeValidationTitle = "";
+        private String mBiometricHint = " ";
 
 
         public Builder(Context context) {
@@ -170,12 +177,15 @@ public class PFFLockScreenConfiguration implements Serializable {
             return this;
         }
 
+        public Builder setBiometricHint(String newBiometricHint) {
+            this.mBiometricHint = newBiometricHint;
+            return this;
+        }
+
         public PFFLockScreenConfiguration build() {
             return new PFFLockScreenConfiguration(
                     this);
         }
-
-
     }
 
     @Retention(SOURCE)
