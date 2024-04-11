@@ -1,6 +1,6 @@
 package com.beautycoder.pflockscreen.fragments;
 
-import static androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG;
+import static androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK;
 import static androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL;
 
 import android.app.AlertDialog;
@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Vibrator;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -43,6 +44,7 @@ import java.util.concurrent.Executor;
  */
 public class PFLockScreenFragment extends Fragment {
     private String biometricHint = " ";
+    public static int bioFlags = BIOMETRIC_WEAK | DEVICE_CREDENTIAL;
 
     private static final String TAG = PFLockScreenFragment.class.getName();
 
@@ -124,9 +126,13 @@ public class PFLockScreenFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        //Log.e("AppActivityLog", "onPFLockStart " + getActivity() + this);
         if (!mIsCreateMode && mUseFingerPrint && mConfiguration.isAutoShowFingerprint() &&
                 isFingerprintApiAvailable(getActivity()) && isFingerprintsExists(getActivity())) {
-            mOnFingerprintClickListener.onClick(mFingerprintButton);
+            //Log.e("AppActivityLog", "onPFLockStart show biometric " + getActivity() + this);
+            new Handler().postDelayed(() -> {
+                mOnFingerprintClickListener.onClick(mFingerprintButton);
+            }, 200);
         }
     }
 
@@ -276,7 +282,7 @@ public class PFLockScreenFragment extends Fragment {
             BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                     .setTitle(biometricHint)
                     //.setSubtitle("")
-                    .setAllowedAuthenticators(BIOMETRIC_STRONG | DEVICE_CREDENTIAL)
+                    .setAllowedAuthenticators(bioFlags)
                     .build();
             biometricPrompt.authenticate(promptInfo);
         }
@@ -310,12 +316,9 @@ public class PFLockScreenFragment extends Fragment {
         mDeleteButton.setEnabled(false);
     }
 
-    private boolean isFingerprintApiAvailable(Context context) {
+    public static boolean isFingerprintApiAvailable(Context context) {
         //return FingerprintManagerCompat.from(context).isHardwareDetected();
-        return BiometricManager.from(context)
-                .canAuthenticate(
-                        BIOMETRIC_STRONG | DEVICE_CREDENTIAL
-                ) == BiometricManager.BIOMETRIC_SUCCESS;
+        return BiometricManager.from(context).canAuthenticate(bioFlags) == BiometricManager.BIOMETRIC_SUCCESS;
     }
 
     private boolean isFingerprintsExists(Context context) {
